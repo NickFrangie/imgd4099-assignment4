@@ -1,12 +1,14 @@
 struct Particle {
-  pos: vec2f,
-  speed: f32
+  angle: f32,
+  radius: f32,
+  speed: f32,
+  empty: f32
 };
 
 @group(0) @binding(0) var<uniform> frame: f32;
 @group(0) @binding(1) var<uniform> res: vec2f;
 @group(0) @binding(2) var<uniform> size: vec2f;
-@group(0) @binding(3) var<uniform> timescale: vec2f;
+@group(0) @binding(3) var<uniform> timescale: f32;
 @group(0) @binding(4) var<storage, read_write> state: array<Particle>;
 
 fn cellindex( cell:vec3u ) -> u32 {
@@ -22,7 +24,5 @@ fn cs(@builtin(global_invocation_id) cell:vec3u)  {
   let p = state[i];
   
   // Calculation
-  var next = p.pos.x + (2. / res.x) * p.speed;
-  if( next >= 1. ) { next -= 2.; }
-  state[i].pos.x = next;
+  state[i].angle = (state[i].angle + state[i].speed * timescale) % 360;
 }

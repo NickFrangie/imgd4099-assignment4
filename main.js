@@ -2,7 +2,7 @@ import { default as seagulls } from "./seagulls.js";
 import { Pane } from "https://cdn.jsdelivr.net/npm/tweakpane@4.0.1/dist/tweakpane.min.js";
 
 const WORKGROUP_SIZE = 8;
-const NUM_PARTICLES = 1024; // must be evenly divisble by 4 to use wgsl structs
+const NUM_PARTICLES = 64; // must be evenly divisble by 4 to use wgsl structs
 const NUM_PROPERTIES = 4;
 
 let frame = 0;
@@ -26,7 +26,7 @@ async function main() {
       sg.uniforms.size = e.value;
     });
   pane
-    .addBinding(params, 'timescale', { min: .8, max: 4 })
+    .addBinding(params, 'timescale', { min: .0, max: 10 })
     .on('change',  e => { 
       sg.uniforms.timescale = e.value; 
     });
@@ -35,16 +35,17 @@ async function main() {
   const state = new Float32Array(NUM_PARTICLES * NUM_PROPERTIES);
 
   // Initialization    
-  for( let i = 0; i < NUM_PARTICLES * NUM_PROPERTIES; i+= NUM_PROPERTIES ) {
-    state[ i ] = -1 + Math.random() * 2
-    state[ i + 1 ] = -1 + Math.random() * 2
-    state[ i + 2 ] = Math.random() * 10
+  for(let i = 0; i < NUM_PARTICLES * NUM_PROPERTIES; i+= NUM_PROPERTIES ) {
+    state[ i ] = Math.random() * 360;
+    state[ i + 1 ] = Math.random();
+    state[ i + 2 ] = Math.random() * .01 + .01;
+    state[ i + 3 ] = 0;
   }
 
   // Seagull
   sg.buffers({ state })
     .backbuffer(false)
-    .blend(true)
+    // .blend(true)
     .uniforms({ 
       frame, 
       res: [sg.width, sg.height],
@@ -56,7 +57,7 @@ async function main() {
     .onframe(() =>  {
       sg.uniforms.frame = frame++  
     })
-    .run( NUM_PARTICLES )
+    .run(NUM_PARTICLES)
 }
 
 main();

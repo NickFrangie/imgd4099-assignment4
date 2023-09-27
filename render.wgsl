@@ -3,9 +3,16 @@ struct VertexInput {
   @builtin(instance_index) instance: u32,
 };
 
+struct VertexOutput {
+  @builtin(position) pos: vec4f,
+  @location(0) @interpolate(flat) instance: u32
+}
+
 struct Particle {
-  pos: vec2f,
-  speed: f32
+  angle: f32,
+  radius: f32,
+  speed: f32,
+  empty: f32
 };
 
 @group(0) @binding(0) var<uniform> frame: f32;
@@ -15,15 +22,22 @@ struct Particle {
 @group(0) @binding(4) var<storage> state: array<Particle>;
 
 @vertex 
-fn vs( input: VertexInput ) ->  @builtin(position) vec4f {
+fn vs( input : VertexInput ) ->  VertexOutput {
   let size = input.pos * .015;
   let aspect = res.y / res.x;
-  let p = state[ input.instance ];
-  return vec4f( p.pos.x - size.x * aspect, p.pos.y + size.y, 0., 1.); 
+  
+  let p = state[input.instance];
+  let pos = p.radius * vec2f(cos(p.angle), sin(p.angle));
+  
+  var out: VertexOutput = VertexOutput();
+  out.pos = vec4f(pos.x - size.x * aspect, pos.y + size.y, 0., 1.);
+  out.instance = input.instance;
+  
+  return out; 
 }
 
 @fragment 
-fn fs( @builtin(position) pos : vec4f ) -> @location(0) vec4f {;
-  let blue = .5 + sin( frame / 60. ) * .5;
-  return vec4f( pos.x / res.x, pos.y / res.y, blue , .1 );
+fn fs( input : VertexOutput  ) -> @location(0) vec4f {
+  let p = state[input.instance];
+  return vec4f( p.radius*20, 1., 1., 1.);
 }
