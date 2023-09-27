@@ -1,121 +1,78 @@
 import { default as seagulls } from "./seagulls.js";
 import { Pane } from "https://cdn.jsdelivr.net/npm/tweakpane@4.0.1/dist/tweakpane.min.js";
 
+const WORKGROUP_SIZE = 8;
+const NUM_PARTICLES = 2048; // must be evenly divisble by 4 to use wgsl structs
+const NUM_PROPERTIES = 4;
+
+let frame = 0;
+
 var params = {
-  leftFeed: 0.13,
-  rightFeed: 0.2,
-  leftKill: 0.03,
-  rightKill: 0.025,
-  diffusionA: 1.0,
-  diffusionB: 0.15,
+  size: 0.015,
+  minRadius: .35,
+  maxRadius: .75,
   timescale: 1,
 };
 
 async function main() {
+  // Imports
   const sg = await seagulls.init();
-  const frag = await seagulls.import("./frag.wgsl");
+  const render = await seagulls.import("./render.wgsl");
   const compute = await seagulls.import("./compute.wgsl");
   
   // Tweakpane
   const pane = new Pane();
   pane
-    .addBinding(params, "leftFeed", { min: 0, max: .5 })
+    .addBinding(params, "size", { min: 0.005, max: .1 })
     .on("change", (e) => {
-      params.leftFeed = e.value;
+      sg.uniforms.size = e.value;
     });
   pane
-    .addBinding(params, "rightFeed", { min: 0, max: .5 })
+    .addBinding(params, "minRadius", { min: 0, max: 1. })
     .on("change", (e) => {
-      params.rightFeed = e.value;
+      sg.uniforms.minRadius = e.value;
     });
   pane
-    .addBinding(params, "leftKill", { min: 0, max: .5 })
+    .addBinding(params, "maxRadius", { min: .0, max: 1. })
     .on("change", (e) => {
-      params.leftKill = e.value;
+      sg.uniforms.maxRadius = e.value;
     });
   pane
-    .addBinding(params, "rightKill", { min: 0, max: .5 })
-    .on("change", (e) => {
-      params.rightKill = e.value;
+    .addBinding(params, 'timescale', { min: .0, max: 10 })
+    .on('change',  e => { 
+      sg.uniforms.timescale = e.value; 
     });
-  pane
-    .addBinding(params, "diffusionA", { min: 0, max: 1 })
-    .on("change", (e) => {
-      params.diffusionA = e.value;
-    });
-  pane
-    .addBinding(params, "diffusionB", { min: 0, max: 1 })
-    .on("change", (e) => {
-      params.diffusionB = e.value;
-    });
-  // pane
-  //   .addBinding(params, 'timescale', { min: .8, max: 4 })
-  //   .on('change',  e => { 
-  //     sg.uniforms.timescale = e.value; 
-  // });
-  pane
-    .addButton({ title: "Reset" })
-    .on("click", main);
 
   // Variables
-  const render = seagulls.constants.vertex + frag;
-
-  const size = window.innerWidth * window.innerHeight,
-        stateA = new Float32Array(size),
-        stateB = new Float32Array(size);
-
-  const workgroups = [
-    Math.round(window.innerWidth / 8),
-    Math.round(window.innerHeight / 8),
-    1,
-  ];
+  const state = new Float32Array(NUM_PARTICLES * NUM_PROPERTIES);
 
   // Initialization    
-  for( let i = 0; i < size; i++ ) {
-    stateA[i] = Math.random();
-    stateB[i] = .5;
-  }
-
-  const feedsize = 500;
-  for (let x = -feedsize; x <= +feedsize; x++) {
-    for (let y = window.innerHeight / 2 - feedsize; y <= window.innerHeight / 2 + feedsize; y++) {
-        const index = y * window.innerWidth + x;
-        stateA[index] = Math.random();
-    }
+  for(let i = 0; i < NUM_PARTICLES * NUM_PROPERTIES; i+= NUM_PROPERTIES ) {
+    state[ i ] = Math.random() * 360;
+    state[ i + 1 ] = Math.random();
+    state[ i + 2 ] = Math.random() * .01 + .01;
+    state[ i + 3 ] = 0;
   }
 
   // Seagull
-  sg
-    .buffers({
-      stateA1: stateA,
-      stateA2: stateA,
-      stateB1: stateB,
-      stateB2: stateB,
-    })
-    .uniforms({
-      resolution: [window.innerWidth, window.innerHeight],
-      leftFeed: params.leftFeed,
-      rightFeed: params.rightFeed,  
-      leftKill: params.leftKill,
-      rightKill: params.rightKill,
-      diffusionA: params.diffusionA,
-      diffusionB: params.diffusionB,
+  sg.buffers({ state })
+    .backbuffer(false)
+    .blend(true)
+    .uniforms({ 
+      frame, 
+      res: [sg.width, sg.height],
+      size: params.size,
+      minRadius: params.minRadius,  
+      maxRadius: params.maxRadius,
       timescale: params.timescale,
     })
-    .onframe(() => {
-      sg.uniforms.leftFeed = params.leftFeed,
-      sg.uniforms.rightFeed = params.rightFeed,  
-      sg.uniforms.leftKill = params.leftKill,
-      sg.uniforms.rightKill = params.rightKill,
-      sg.uniforms.diffusionA = params.diffusionA;
-      sg.uniforms.diffusionB = params.diffusionB;
-      // sg.uniforms.timescale = params.timescale;
-    })
-    .backbuffer(false)
-    .pingpong(1)
-    .compute(compute, workgroups, { pingpong: ["stateA1", "stateB1"] })
+    .compute(compute, NUM_PARTICLES / (WORKGROUP_SIZE * WORKGROUP_SIZE) )
     .render(render)
-    .run();
+    .onframe(() =>  {
+      frame += params.timescale;
+      sg.uniforms.frame = frame;
+    })
+    .run(NUM_PARTICLES)
 }
 
 main();
