@@ -17,20 +17,23 @@ struct Particle {
 
 @group(0) @binding(0) var<uniform> frame: f32;
 @group(0) @binding(1) var<uniform> res: vec2f;
-@group(0) @binding(2) var<uniform> size: vec2f;
-@group(0) @binding(3) var<uniform> timescale: vec2f;
-@group(0) @binding(4) var<storage> state: array<Particle>;
+@group(0) @binding(2) var<uniform> sizeFactor: f32;
+@group(0) @binding(3) var<uniform> minRadius: f32;
+@group(0) @binding(4) var<uniform> maxRadius: f32;
+@group(0) @binding(5) var<uniform> timescale: f32;
+@group(0) @binding(6) var<storage> state: array<Particle>;
 
 @vertex 
 fn vs( input : VertexInput ) ->  VertexOutput {
-  let size = input.pos * .015;
+  let size = input.pos * sizeFactor;
   let aspect = res.y / res.x;
   
   let p = state[input.instance];
-  let pos = p.radius * vec2f(cos(p.angle), sin(p.angle));
+  let modifiedRadius = p.radius * (maxRadius - minRadius) + minRadius;
+  let convertedPos = modifiedRadius * vec2f(cos(p.angle), sin(p.angle));
   
   var out: VertexOutput = VertexOutput();
-  out.pos = vec4f(pos.x - size.x * aspect, pos.y + size.y, 0., 1.);
+  out.pos = vec4f(convertedPos.x - size.x * aspect, convertedPos.y + size.y, 0., 1.);
   out.instance = input.instance;
   
   return out; 
@@ -39,5 +42,10 @@ fn vs( input : VertexInput ) ->  VertexOutput {
 @fragment 
 fn fs( input : VertexOutput  ) -> @location(0) vec4f {
   let p = state[input.instance];
-  return vec4f( p.radius*20, 1., 1., 1.);
+  let modifiedRadius = p.radius * (maxRadius - minRadius) + minRadius;
+  
+  let red = .5 + sin(frame / 60. - modifiedRadius) * .5;
+  let green = .5 + sin(frame / 120.) * .5;
+  let blue = .5 + sin(modifiedRadius + frame / 180. ) * .5;
+  return vec4f(red, green , blue , 1. );
 }
